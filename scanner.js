@@ -1,9 +1,20 @@
 require('dotenv').config()
+const winston = require('winston');
 const cheerio = require('cheerio')
 const rpn = require('request-promise-native')
 const accountSid = process.env.ACCOUNT_SID;
 const authToken = process.env.AUTH_TOKEN;
 const client = require('twilio')(accountSid, authToken);
+
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.json(),
+  defaultMeta: { service: 'user-service' },
+  transports: [
+    new winston.transports.File({ filename: 'error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'combined.log' })
+  ]
+});
 
 let results = [];
 const options = {
@@ -25,7 +36,7 @@ const options = {
 };
 
 const scan = async () => {
-    console.log('Checking bourbons')
+    logger.info('Checking bourbons')
     const resHTML = await rpn(options)
     const tempList = []
     const $ = cheerio.load(resHTML)
@@ -42,8 +53,12 @@ const scan = async () => {
       acc[item.sku] = item
       return acc
     },{})
-    if(tempList.length===0) return
+    if(tempList.length===0) {
+      logger.error('No results received')
+      return
+    }
     if(results.length===0 ){
+      logger.info('Setting saved results:', tempItemMap)
       results = tempItemMap
       return
     }
@@ -53,18 +68,21 @@ const scan = async () => {
       return acc
     },[])
     if(newSKUs.length>0){
-      console.log('Found new order info:', newSKUs)
+      logger.info('Found new order info:', newSKUs)
+      results = tempItemMap
       const bodyMsg = newSKUs.reduce((acc, item)=>{return `${acc} ${item.name}: ${item.price} - ${item.link}\n`},'**New Bourbon Alert: \n')
       const slackMsg = newSKUs.reduce((acc, item)=>{return `${acc} ${item.name}: ${item.price} - <${item.link}|Purchase>\n`},'**New Bourbon Alert: \n')
       client.messages.create({
        body: bodyMsg,
        from: process.env.TWILIO_SENDER,
        to: process.env.TWILIO_RECIP
-     })
-    .then(message => console.log(message.sid))
+      })
+      .then(message => console.log(message.sid))
 
-    rpn({uri: process.env.SLACK_HOOK_URI, method:'POST', body: {icon_emoji:':tumbler_glass:', username: 'booze-bot', text: slackMsg}, json: true})
-  }
+      rpn({uri: process.env.SLACK_HOOK_URI, method:'POST', body: {icon_emoji:':tumbler_glass:', username: 'booze-bot', text: slackMsg}, json: true})
+    } else {
+      logger.info('No new bourbons found...')
+    }
 }
 scan()
 setInterval(()=>scan(), 60000)
