@@ -85,4 +85,4 @@ const scan = async () => {
     }
 }
 scan()
-setInterval(()=>scan(), 60000)
+setInterval(()=>scan(), process.env.POLL_FREQUENCY)
