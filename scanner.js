@@ -46,6 +46,7 @@ const scan = async () => {
       item.name = $('a', el).text().trim()
       item.link = 'https://klwines.com' + $('a', el).attr('href')
       item.sku = $('td:nth-of-type(2)', el).text().trim()
+      item.quantity = $('td:nth-of-type(6)', el).text().trim()
       item.price = $('.price', el).text().trim()
       tempList.push(item)
     })
@@ -70,8 +71,8 @@ const scan = async () => {
     if(newSKUs.length>0){
       logger.info('Found new order info:', newSKUs)
       results = tempItemMap
-      const bodyMsg = newSKUs.reduce((acc, item)=>{return `${acc} ${item.name}: ${item.price} - ${item.link}\n`},'**New Bourbon Alert: \n')
-      const slackMsg = newSKUs.reduce((acc, item)=>{return `${acc} ${item.name}: ${item.price} - <${item.link}|Purchase>\n`},'**New Bourbon Alert: \n')
+      const bodyMsg = newSKUs.reduce((acc, item)=>{return `${acc} ${item.name}: ${item.price} - ${item.quantity} left ${item.link}\n`},'**New Bourbon Alert: \n')
+      const slackMsg = newSKUs.reduce((acc, item)=>{return `${acc} ${item.name}: ${item.price} - ${item.quantity} left <${item.link}|Purchase>\n`},'**New Bourbon Alert: \n')
       client.messages.create({
        body: bodyMsg,
        from: process.env.TWILIO_SENDER,
